@@ -4,8 +4,6 @@
   "private": true,
   "license": "GPL-3.0-or-later",
   "workspaces": [
-    "packages/apis/*",
-    "packages/apps/*",
     "packages/clis/*",
     "packages/libs/*"
   ],
