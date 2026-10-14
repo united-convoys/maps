@@ -66,6 +66,16 @@ MAP_FILES += $(GENERATOR_OUT_DIR)/ats-contours.pmtiles
 MAP_FILES += $(GENERATOR_OUT_DIR)/ets2-contours.pmtiles
 
 
+# Create ATS and ETS2 elevation point (exact node heights) pmtiles files
+$(GENERATOR_OUT_DIR)/ats-elevation.pmtiles: $(ATS_PARSER_JSON_FILES)
+	npx generator elevation -m usa -i $(PARSER_OUT_DIR) -o $(GENERATOR_OUT_DIR)
+$(GENERATOR_OUT_DIR)/ets2-elevation.pmtiles: $(ETS2_PARSER_JSON_FILES)
+	npx generator elevation -m europe -i $(PARSER_OUT_DIR) -o $(GENERATOR_OUT_DIR)
+
+MAP_FILES += $(GENERATOR_OUT_DIR)/ats-elevation.pmtiles
+MAP_FILES += $(GENERATOR_OUT_DIR)/ets2-elevation.pmtiles
+
+
 #### geojson files
 
 # Create combined ATS and ETS2 cities.geojson file

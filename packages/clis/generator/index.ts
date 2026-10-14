@@ -6,6 +6,7 @@ import { hideBin } from 'yargs/helpers';
 import * as achievements from './commands/achievements';
 import * as cities from './commands/cities';
 import * as contours from './commands/contours';
+import * as elevation from './commands/elevation';
 import * as ets2Villages from './commands/ets2-villages';
 import * as footprints from './commands/footprints';
 import * as graph from './commands/graph';
@@ -21,6 +22,7 @@ async function main() {
     .command(ets2Villages)
     .command(footprints)
     .command(contours)
+    .command(elevation)
     .command(achievements)
     .command(spritesheet)
     .command(graph)

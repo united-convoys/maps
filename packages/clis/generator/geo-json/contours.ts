@@ -24,6 +24,9 @@ export function convertToContoursGeoJson({
       max = p[2];
     }
   }
+  // heights carry decimals; keep contour levels on whole units.
+  min = Math.floor(min);
+  max = Math.ceil(max);
   const levels = max - min + 1;
 
   logger.log('calculating sector mask...');
