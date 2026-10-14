@@ -7,14 +7,8 @@ import { Byte } from './restructure-helpers';
 import type { DirectoryEntry, Entries, FileEntry } from './scs-archive';
 import { city64, createStore, deflate } from './scs-archive';
 
-const CompressionMethod = {
-  None: 0,
-  Deflate: 8,
-};
-
 const Signature = {
   EndOfCentralDirectory: 0x06054b50,
-  CentralDirectoryFileHeader: 0x02014b50,
 };
 
 const EndOfCentralDirectory = new r.Struct({
@@ -151,19 +145,19 @@ export class ZipArchive {
     this.reader.offset = this.eocdRecord.centralDirectoryOffset;
     const entries: r.BaseOf<typeof CentralDirectoryFileHeader>[] = [];
 
-    while (
-      this.reader.offset <
-      this.eocdRecord.centralDirectoryOffset +
-        this.eocdRecord.centralDirectorySize
-    ) {
-      const signature = this.reader.ReadUInt32LE();
-      if (signature !== Signature.CentralDirectoryFileHeader) {
-        break;
-      }
+    // Protected ("encrypted") mods corrupt header signatures and the central
+    // directory size, so like ts-map we walk `totalEntries` entries without
+    // validating signatures.
+    for (let i = 0; i < this.eocdRecord.totalEntries; i++) {
+      this.reader.SeekOffset(4); // signature
       const buffer = this.reader.ReadBytes(CentralDirectoryFileHeader.size());
       const file = CentralDirectoryFileHeader.fromBuffer(buffer);
 
-      file.fileName = this.reader.ReadBytes(file.fileNameLength).toString();
+      file.fileName = this.reader
+        .ReadBytes(file.fileNameLength)
+        .toString()
+        .replaceAll('\\', '/')
+        .replace(/\/$/, '');
       file.extraField = this.reader.ReadBytes(file.extraFieldLength);
       file.fileComment = this.reader
         .ReadBytes(file.fileCommentLength)
@@ -275,32 +269,24 @@ abstract class ZipArchiveEntry {
   }
 
   read() {
-    this.reader.offset = this.entry.localFileHeaderOffset + 26;
-    const fileNameLength = this.reader.ReadUInt16LE();
+    // Protected mods may corrupt the local header's file name length and the
+    // compression method, so (like ts-map) use the central directory's name
+    // length and infer compression from the sizes.
+    this.reader.offset = this.entry.localFileHeaderOffset + 28;
     const extraFieldLength = this.reader.ReadUInt16LE();
-    this.reader.SeekOffset(fileNameLength + extraFieldLength);
+    this.reader.SeekOffset(this.entry.fileNameLength + extraFieldLength);
     const rawData = this.reader.ReadBytes(this.entry.compressedSize);
 
-    switch (this.entry.compressedMethod) {
-      case CompressionMethod.Deflate: {
-        const outBuffer = Buffer.alloc(this.entry.uncompressedSize);
-
-        const result = deflate(rawData.buffer, outBuffer.buffer);
-        if (result !== 0) {
-          throw new Error(`deflate error: ${result}`);
-        }
-        return outBuffer;
-      }
-
-      case CompressionMethod.None: {
-        return rawData;
-      }
-
-      default:
-        throw new Error(
-          `unsupported compression type ${this.entry.compressedMethod}`,
-        );
+    if (this.entry.compressedSize === this.entry.uncompressedSize) {
+      return rawData;
     }
+
+    const outBuffer = Buffer.alloc(this.entry.uncompressedSize);
+    const result = deflate(rawData.buffer, outBuffer.buffer);
+    if (result !== 0) {
+      throw new Error(`deflate error: ${result}`);
+    }
+    return outBuffer;
   }
 }
 
