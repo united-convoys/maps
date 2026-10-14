@@ -262,7 +262,8 @@ const SimpleItemStruct = {
     nodes: new r.Array(
       new r.Struct({
         nodeUid: uint64le,
-        nodeFlag: r.uint32le,
+        // before 906, flags are stored in a separate `nodeFlags` array
+        nodeFlag: new r.Optional(r.uint32le, () => versionFormat >= 906),
       }),
       r.uint32le,
     ),
@@ -446,23 +447,27 @@ const SimpleItemStruct = {
     overrideTemplate: uint64String,
     overrides: new r.Optional(
       new r.Struct({
-        boards: new r.Array(
-          new r.Struct({
-            areaName: token64,
-            flags: r.uint8,
-            offsets: new r.Optional(
-              new r.Struct({
-                x: r.int8,
-                y: r.int8,
-              }),
-              (parent: { flags: number }) => (parent.flags & 0x01) !== 0,
-            ),
-            token: new r.Optional(
-              token64,
-              (parent: { flags: number }) => (parent.flags & 0x02) !== 0,
-            ),
-          }),
-          r.uint32le,
+        // new in 906
+        boards: new r.Optional(
+          new r.Array(
+            new r.Struct({
+              areaName: token64,
+              flags: r.uint8,
+              offsets: new r.Optional(
+                new r.Struct({
+                  x: r.int8,
+                  y: r.int8,
+                }),
+                (parent: { flags: number }) => (parent.flags & 0x01) !== 0,
+              ),
+              token: new r.Optional(
+                token64,
+                (parent: { flags: number }) => (parent.flags & 0x02) !== 0,
+              ),
+            }),
+            r.uint32le,
+          ),
+          () => versionFormat >= 906,
         ),
         items: new r.Array(
           new r.Struct({
@@ -589,15 +594,17 @@ const SimpleItemStruct = {
     // debugStruct,
   },
   [ItemType.Curve]: {
+    // before 907 there's a single, unmasked subcurve whose model comes first
+    legacyModel: new r.Optional(token64, () => versionFormat < 907),
     startNodeUid: uint64le,
     endNodeUid: uint64le,
     paddingUids: new r.Array(uint64le, 2),
     length: r.floatle,
-    subcurveUseMask: r.uint32le,
+    subcurveUseMask: new r.Optional(r.uint32le, () => versionFormat >= 907),
     subcurves: new r.Array(
       new r.Struct({
-        model: token64,
-        flags: r.uint32le,
+        model: new r.Optional(token64, () => versionFormat >= 907),
+        flags: new r.Optional(r.uint32le, () => versionFormat >= 907),
         randomSeed: r.uint32le,
         stretchCoef: r.floatle,
         scale: r.floatle,
@@ -610,13 +617,22 @@ const SimpleItemStruct = {
         centerPartVariation: token64,
         modelLook: token64,
         heightOffsets: new r.Array(r.floatle, r.uint32le),
-        initialHeightOffset: r.floatle,
-        offsetFromBaseCurveStartX: r.floatle,
-        offsetFromBaseCurveStartY: r.floatle,
-        offsetFromBaseCurveEndX: r.floatle,
-        offsetFromBaseCurveEndY: r.floatle,
+        // new in 907
+        offsets: new r.Optional(
+          new r.Struct({
+            initialHeightOffset: r.floatle,
+            offsetFromBaseCurveStartX: r.floatle,
+            offsetFromBaseCurveStartY: r.floatle,
+            offsetFromBaseCurveEndX: r.floatle,
+            offsetFromBaseCurveEndY: r.floatle,
+          }),
+          () => versionFormat >= 907,
+        ),
       }),
       (parent: { subcurveUseMask: number }) => {
+        if (versionFormat < 907) {
+          return 1;
+        }
         let n = parent.subcurveUseMask;
         // count number of bits set in `n`
         let count = 0;
@@ -1023,16 +1039,20 @@ function toCurve(
   rawItem: SectorItem<ItemType.Curve>,
 ): WithoutSectorXY<Curve> | undefined {
   assert(rawItem.subcurves.length >= 1, 'curve has no subcurves');
+  const subcurves = rawItem.subcurves.map(sc => ({
+    ...sc,
+    model: sc.model ?? rawItem.legacyModel,
+  }));
   if (
-    rawItem.subcurves.every(sc => sc.model !== '0i03a') &&
-    rawItem.subcurves.every(sc => sc.model !== '0i03b')
+    subcurves.every(sc => sc.model !== '0i03a') &&
+    subcurves.every(sc => sc.model !== '0i03b')
   ) {
     return;
   }
 
   return {
     ...toBaseItem(rawItem),
-    subcurves: rawItem.subcurves.map(sc => ({
+    subcurves: subcurves.map(sc => ({
       model: sc.model,
       look: sc.modelLook,
       numBuildings: sc.heightOffsets.length,
