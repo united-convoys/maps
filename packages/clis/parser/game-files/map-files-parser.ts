@@ -1109,8 +1109,11 @@ export function postProcess(
     mapData: {
       nodes: referencedNodes,
       elevation: elevationNodes.map(
-        ({ x, y, z }) =>
-          [x, y, z].map(i => Math.round(i)) as [number, number, number],
+        ({ x, y, z }) => [
+          Math.round(x),
+          Math.round(y),
+          Math.round(z * 100) / 100
+        ] as [number, number, number]
       ),
       roads,
       ferries,
