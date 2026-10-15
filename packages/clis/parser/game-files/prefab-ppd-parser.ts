@@ -289,7 +289,10 @@ const roadOffsetToOffset = {
 
 const versionWarnings = new Set<number>();
 
-export function parsePrefabPpd(buffer: Buffer): PrefabDescription {
+export function parsePrefabPpd(
+  buffer: Buffer,
+  path?: string,
+): PrefabDescription {
   ppdVersion = buffer.readUint32LE();
   if (ppdVersion < 24) {
     if (!versionWarnings.has(ppdVersion)) {
@@ -381,7 +384,7 @@ export function parsePrefabPpd(buffer: Buffer): PrefabDescription {
             const key = roadSize as keyof typeof roadSizeToLanes;
             ({ lanesLeft, lanesRight } = roadSizeToLanes[key]);
           } else {
-            logger.warn('unknown road size', roadSize);
+            logger.warn('unknown road size', roadSize, 'in', path);
           }
 
           let offset = 0;
@@ -390,7 +393,14 @@ export function parsePrefabPpd(buffer: Buffer): PrefabDescription {
             const key = roadOffset as keyof typeof roadOffsetToOffset;
             offset = roadOffsetToOffset[key];
           } else {
-            logger.warn('unknown road size', roadSize);
+            logger.warn(
+              'unknown road offset',
+              roadOffset,
+              'for road size',
+              roadSize,
+              'in',
+              path,
+            );
           }
 
           if (lanesLeft === 'auto' && lanesRight === 'auto') {

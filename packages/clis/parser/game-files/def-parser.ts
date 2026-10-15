@@ -661,7 +661,7 @@ function processPrefabJson(
       continue;
     }
     try {
-      const ppd = parsePrefabPpd(ppdFile.read());
+      const ppd = parsePrefabPpd(ppdFile.read(), path);
       // if (ppd.mapPoints.some(p => p.type === 'polygon')) {
       // TODO figure out a way to get building footprint information for
       //  polygons in prefabs that look like buildings.
