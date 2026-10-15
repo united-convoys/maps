@@ -514,6 +514,11 @@ export function postProcess(
         break;
       case ItemType.Prefab:
         checkReference(item.token, defData.prefabs, 'prefab token', item);
+        if (!defData.prefabs.has(item.token)) {
+          // e.g., a prefab from a mod or DLC that isn't loaded. The generator
+          // can't render a prefab without its description, so skip it.
+          break;
+        }
         checkReference(item.nodeUids, nodesByUid, 'nodeUids', item);
         referencedPrefabTokens.add(item.token);
         item.nodeUids.forEach(uid => {
