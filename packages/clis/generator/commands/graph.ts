@@ -1,11 +1,12 @@
-import { distance, type Position } from '@truckermudgeon/base/geom';
-import { calculateLaneInfo, toMapPosition } from '@truckermudgeon/map/prefabs';
+import type { Position } from '@truckermudgeon/base/geom';
+import { toMapPosition } from '@truckermudgeon/map/prefabs';
 import fs from 'fs';
 import path from 'path';
 import type { Argv, BuilderArguments } from 'yargs';
 import { checkGraph } from '../graph/check-graph';
 import { toDemoGraph } from '../graph/demo-graph';
 import { generateGraph, rotateRight } from '../graph/graph';
+import { shortestPrefabCurvePaths } from '../graph/prefab-curve-paths';
 import { logger } from '../logger';
 import { readMapData } from '../mapped-data';
 import { maybeEnsureOutputDir, untildify } from './path-helpers';
@@ -139,8 +140,8 @@ function toRoutingNodes(
  *
  * The graph connects a prefab's entry node straight to its exit node, so
  * without these curves a route through a roundabout or junction can only be
- * drawn as a guess between the two nodes. When several lanes connect the same
- * nodes, the shortest is kept.
+ * drawn as a guess between the two nodes. Each curve is the shortest path
+ * through the prefab's lanes between the two nodes.
  */
 function toRoutingPrefabCurves(
   graph: ReturnType<typeof generateGraph>,
@@ -156,35 +157,22 @@ function toRoutingPrefabCurves(
   }
 
   const round = (v: number) => Math.round(v * 100) / 100;
-  const lengthOf = (points: Position[]) =>
-    points.reduce(
-      (sum, p, i) => (i === 0 ? 0 : sum + distance(points[i - 1], p)),
-      0,
-    );
 
-  const laneInfoByToken = new Map<
+  const pathsByToken = new Map<
     string,
-    ReturnType<typeof calculateLaneInfo> | null
+    ReturnType<typeof shortestPrefabCurvePaths>
   >();
   const curves: Record<string, Position[]> = {};
-  let failedPrefabs = 0;
 
   for (const prefab of prefabs.values()) {
     const desc = prefabDescriptions.get(prefab.token);
     if (!desc) {
       continue;
     }
-    if (!laneInfoByToken.has(prefab.token)) {
-      try {
-        laneInfoByToken.set(prefab.token, calculateLaneInfo(desc));
-      } catch {
-        laneInfoByToken.set(prefab.token, null);
-      }
-    }
-    const laneInfo = laneInfoByToken.get(prefab.token);
-    if (!laneInfo) {
-      failedPrefabs++;
-      continue;
+    let paths = pathsByToken.get(prefab.token);
+    if (!paths) {
+      paths = shortestPrefabCurvePaths(desc);
+      pathsByToken.set(prefab.token, paths);
     }
 
     // Same mapping from prefab description node index to item node as
@@ -195,32 +183,20 @@ function toRoutingPrefabCurves(
     );
     const tx = (pos: Position) => toMapPosition(pos, prefab, desc, nodes);
 
-    for (const [fromIndex, lanes] of laneInfo) {
-      const fromUid = nodeUids[fromIndex];
-      if (fromUid === undefined) {
+    for (const path of paths) {
+      const fromUid = nodeUids[path.fromNodeIndex];
+      const toUid = nodeUids[path.toNodeIndex];
+      const key = `${fromUid}-${toUid}`;
+      if (fromUid === undefined || toUid === undefined || !edgeKeys.has(key)) {
         continue;
       }
-      for (const lane of lanes) {
-        for (const branch of lane.branches) {
-          const toUid = nodeUids[branch.targetNodeIndex];
-          const key = `${fromUid}-${toUid}`;
-          if (toUid === undefined || !edgeKeys.has(key)) {
-            continue;
-          }
-          const points = branch.curvePoints.map(p => {
-            const [x, y] = tx(p);
-            return [round(x), round(y)] as Position;
-          });
-          if (!curves[key] || lengthOf(points) < lengthOf(curves[key])) {
-            curves[key] = points;
-          }
-        }
-      }
+      curves[key] = path.points.map(p => {
+        const [x, y] = tx(p);
+        return [round(x), round(y)] as Position;
+      });
     }
   }
 
-  logger.info(
-    `${Object.keys(curves).length} prefab curves (${failedPrefabs} prefab items without lane info)`,
-  );
+  logger.info(`${Object.keys(curves).length} prefab curves`);
   return curves;
 }
