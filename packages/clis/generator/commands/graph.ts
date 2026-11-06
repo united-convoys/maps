@@ -82,7 +82,47 @@ export async function handler(args: BuilderArguments<typeof builder>) {
         path.join(args.outputDir, `${args.map}-graph.json`),
         JSON.stringify([...graph.entries()], null, 2),
       );
+      fs.writeFileSync(
+        path.join(args.outputDir, `${args.map}-routing-nodes.json`),
+        JSON.stringify(toRoutingNodes(graph, tsMapData)),
+      );
     }
   }
   logger.success('done.');
+}
+
+/**
+ * The positions and headings of every node referenced by the graph, for the
+ * united-convoys/router service. Graph keys and neighbor ids are hex uids, the
+ * same keys used by `tsMapData.nodes`.
+ */
+function toRoutingNodes(
+  graph: ReturnType<typeof generateGraph>,
+  tsMapData: ReturnType<typeof readMapData>,
+) {
+  const ids = new Set<string>();
+  for (const [id, neighbors] of graph) {
+    ids.add(id);
+    for (const n of [...neighbors.forward, ...neighbors.backward]) {
+      ids.add(n.nodeId);
+    }
+  }
+
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+  const nodes = [];
+  for (const id of ids) {
+    const node = tsMapData.nodes.get(id);
+    if (!node) {
+      continue;
+    }
+    nodes.push({
+      uid: id,
+      x: round(node.x),
+      y: round(node.y),
+      z: round(node.z),
+      rotation: round(node.rotation),
+    });
+  }
+  logger.info(`${nodes.length} routing nodes`);
+  return nodes;
 }
