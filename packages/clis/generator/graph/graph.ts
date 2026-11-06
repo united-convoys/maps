@@ -599,7 +599,7 @@ function convertToNodeMap(
   return nodeMap;
 }
 
-function rotateRight<T>(arr: T[], count: number): T[] {
+export function rotateRight<T>(arr: T[], count: number): T[] {
   Preconditions.checkArgument(0 <= count && count < arr.length);
   if (count === 0) {
     return arr;

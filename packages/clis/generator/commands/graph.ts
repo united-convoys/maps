@@ -1,9 +1,11 @@
+import { distance, type Position } from '@truckermudgeon/base/geom';
+import { calculateLaneInfo, toMapPosition } from '@truckermudgeon/map/prefabs';
 import fs from 'fs';
 import path from 'path';
 import type { Argv, BuilderArguments } from 'yargs';
 import { checkGraph } from '../graph/check-graph';
 import { toDemoGraph } from '../graph/demo-graph';
-import { generateGraph } from '../graph/graph';
+import { generateGraph, rotateRight } from '../graph/graph';
 import { logger } from '../logger';
 import { readMapData } from '../mapped-data';
 import { maybeEnsureOutputDir, untildify } from './path-helpers';
@@ -86,6 +88,10 @@ export async function handler(args: BuilderArguments<typeof builder>) {
         path.join(args.outputDir, `${args.map}-routing-nodes.json`),
         JSON.stringify(toRoutingNodes(graph, tsMapData)),
       );
+      fs.writeFileSync(
+        path.join(args.outputDir, `${args.map}-routing-prefab-curves.json`),
+        JSON.stringify(toRoutingPrefabCurves(graph, tsMapData)),
+      );
     }
   }
   logger.success('done.');
@@ -125,4 +131,96 @@ function toRoutingNodes(
   }
   logger.info(`${nodes.length} routing nodes`);
   return nodes;
+}
+
+/**
+ * The path through a prefab for every graph edge that crosses one, keyed by
+ * `${fromNodeUid}-${toNodeUid}`, in map space.
+ *
+ * The graph connects a prefab's entry node straight to its exit node, so
+ * without these curves a route through a roundabout or junction can only be
+ * drawn as a guess between the two nodes. When several lanes connect the same
+ * nodes, the shortest is kept.
+ */
+function toRoutingPrefabCurves(
+  graph: ReturnType<typeof generateGraph>,
+  tsMapData: ReturnType<typeof readMapData>,
+): Record<string, Position[]> {
+  const { nodes, prefabs, prefabDescriptions } = tsMapData;
+
+  const edgeKeys = new Set<string>();
+  for (const [id, neighbors] of graph) {
+    for (const n of [...neighbors.forward, ...neighbors.backward]) {
+      edgeKeys.add(`${id}-${n.nodeId}`);
+    }
+  }
+
+  const round = (v: number) => Math.round(v * 100) / 100;
+  const lengthOf = (points: Position[]) =>
+    points.reduce(
+      (sum, p, i) => (i === 0 ? 0 : sum + distance(points[i - 1], p)),
+      0,
+    );
+
+  const laneInfoByToken = new Map<
+    string,
+    ReturnType<typeof calculateLaneInfo> | null
+  >();
+  const curves: Record<string, Position[]> = {};
+  let failedPrefabs = 0;
+
+  for (const prefab of prefabs.values()) {
+    const desc = prefabDescriptions.get(prefab.token);
+    if (!desc) {
+      continue;
+    }
+    if (!laneInfoByToken.has(prefab.token)) {
+      try {
+        laneInfoByToken.set(prefab.token, calculateLaneInfo(desc));
+      } catch {
+        laneInfoByToken.set(prefab.token, null);
+      }
+    }
+    const laneInfo = laneInfoByToken.get(prefab.token);
+    if (!laneInfo) {
+      failedPrefabs++;
+      continue;
+    }
+
+    // Same mapping from prefab description node index to item node as
+    // `convertToNodeMap` in graph.ts.
+    const nodeUids = rotateRight(
+      prefab.nodeUids.map(id => id.toString(16)),
+      prefab.originNodeIndex,
+    );
+    const tx = (pos: Position) => toMapPosition(pos, prefab, desc, nodes);
+
+    for (const [fromIndex, lanes] of laneInfo) {
+      const fromUid = nodeUids[fromIndex];
+      if (fromUid === undefined) {
+        continue;
+      }
+      for (const lane of lanes) {
+        for (const branch of lane.branches) {
+          const toUid = nodeUids[branch.targetNodeIndex];
+          const key = `${fromUid}-${toUid}`;
+          if (toUid === undefined || !edgeKeys.has(key)) {
+            continue;
+          }
+          const points = branch.curvePoints.map(p => {
+            const [x, y] = tx(p);
+            return [round(x), round(y)] as Position;
+          });
+          if (!curves[key] || lengthOf(points) < lengthOf(curves[key])) {
+            curves[key] = points;
+          }
+        }
+      }
+    }
+  }
+
+  logger.info(
+    `${Object.keys(curves).length} prefab curves (${failedPrefabs} prefab items without lane info)`,
+  );
+  return curves;
 }
