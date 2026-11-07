@@ -137,6 +137,8 @@ function main() {
       flags: 'a',
     });
     try {
+      // The chunked loop below writes nothing for an empty collection.
+      if (collection.length === 0) ws.write('[]');
       for (let start = 0; start < collection.length; start += 32768) {
         let str = JSON.stringify(
           collection.slice(start, start + 32768),
