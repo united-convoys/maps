@@ -6,6 +6,7 @@ import {
 } from '@truckermudgeon/map/constants';
 import type {
   BaseItem,
+  BusStopItem,
   Building,
   CityArea,
   CompanyItem,
@@ -787,6 +788,8 @@ export function parseSector(buffer: Buffer) {
             return toFerry(ri);
           case ItemType.Company:
             return toCompany(ri);
+          case ItemType.BusStop:
+            return toBusStop(ri);
           case ItemType.Cutscene:
             return toCutscene(ri);
           case ItemType.Trigger:
@@ -967,6 +970,17 @@ function toCompany(
     prefabUid: rawItem.post_901_data
       ? rawItem.post_901_data.prefabUid
       : rawItem.pre_902_data.prefabUid,
+    nodeUid: rawItem.nodeUid,
+  };
+}
+
+function toBusStop(
+  rawItem: SectorItem<ItemType.BusStop>,
+): WithoutSectorXY<BusStopItem> {
+  return {
+    ...toBaseItem(rawItem),
+    cityToken: rawItem.cityName,
+    prefabUid: rawItem.prefabUid,
     nodeUid: rawItem.nodeUid,
   };
 }

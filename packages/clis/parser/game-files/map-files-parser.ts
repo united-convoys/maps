@@ -10,6 +10,7 @@ import {
 import { toMapPosition } from '@truckermudgeon/map/prefabs';
 import type {
   Building,
+  BusStopItem,
   City,
   CityArea,
   CompanyItem,
@@ -478,6 +479,7 @@ export function postProcess(
   const prefabsByUid = new Map<bigint, Prefab>();
   const mapAreas: MapArea[] = [];
   const cutscenes: Cutscene[] = [];
+  const busStops: BusStopItem[] = [];
   const triggers: Trigger[] = [];
   const signs: Sign[] = [];
   const ferryItems = new Map<string, FerryItem>();
@@ -559,6 +561,14 @@ export function postProcess(
         referencedNodeUids.add(item.nodeUid);
         poifulItems.push(item);
         break;
+      case ItemType.BusStop: {
+        checkReference(item.nodeUid, nodesByUid, 'nodeUid', item);
+        checkReference(item.cityToken, defData.cities, 'city token', item);
+        // prefer the node position; fall back to the item's bounding-box center.
+        const node = nodesByUid.get(item.nodeUid);
+        busStops.push(node ? { ...item, x: node.x, y: node.y } : item);
+        break;
+      }
       case ItemType.Cutscene:
         checkReference(item.nodeUid, nodesByUid, 'nodeUid', item);
         referencedNodeUids.add(item.nodeUid);
@@ -1124,6 +1134,7 @@ export function postProcess(
       ferries,
       prefabs,
       companies,
+      busStops,
       models,
       mapAreas,
       pois,

@@ -383,6 +383,14 @@ export type CompanyItem = BaseItem &
     nodeUid: bigint;
   }>;
 
+export type BusStopItem = BaseItem &
+  Readonly<{
+    type: ItemType.BusStop;
+    cityToken: string;
+    prefabUid: bigint;
+    nodeUid: bigint;
+  }>;
+
 export type Cutscene = BaseItem &
   Readonly<{
     type: ItemType.Cutscene;
@@ -434,6 +442,7 @@ export type Item =
   | MapOverlay
   | FerryItem
   | CompanyItem
+  | BusStopItem
   | Cutscene
   | Trigger
   | Sign
@@ -578,6 +587,7 @@ export interface MapData extends DefData {
   ferries: Ferry[];
   prefabs: Prefab[];
   companies: CompanyItem[];
+  busStops: BusStopItem[];
   models: Model[];
   mapAreas: MapArea[];
   pois: Poi[];
