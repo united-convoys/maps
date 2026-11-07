@@ -418,6 +418,10 @@ export function parseIconMatFiles(entries: Entries) {
       'dealer_ico',
       'garage_large_ico',
       'recruitment_ico',
+      // only exported when the game has a matching icon
+      'hotel_ico',
+      'truck_stop_ico',
+      'bus_station_ico',
       // not rendered on map, but useful for Map Legend UI
       'city_names_ico',
       'companies_ico',
@@ -681,6 +685,7 @@ export function postProcess(
               });
               break;
             case SpawnPointType.WeightStationPos:
+            case SpawnPointType.WeightCatPos:
               pois.push({
                 ...prefabMeta,
                 ...pos,
@@ -711,6 +716,30 @@ export function postProcess(
                 ...pos,
                 type: 'facility',
                 icon: 'recruitment_ico',
+              });
+              break;
+            case SpawnPointType.Hotel:
+              pois.push({
+                ...prefabMeta,
+                ...pos,
+                type: 'facility',
+                icon: 'hotel_ico',
+              });
+              break;
+            case SpawnPointType.TruckStopPos:
+              pois.push({
+                ...prefabMeta,
+                ...pos,
+                type: 'facility',
+                icon: 'truck_stop_ico',
+              });
+              break;
+            case SpawnPointType.BusStation:
+              pois.push({
+                ...prefabMeta,
+                ...pos,
+                type: 'facility',
+                icon: 'bus_station_ico',
               });
               break;
             default:

@@ -389,6 +389,10 @@ export const FacilitySpawnPointTypes = new Set([
   SpawnPointType.TruckDealerPos,
   SpawnPointType.BuyPos,
   SpawnPointType.RecruitmentPos,
+  SpawnPointType.Hotel,
+  SpawnPointType.TruckStopPos,
+  SpawnPointType.BusStation,
+  SpawnPointType.WeightCatPos,
 ]);
 
 export function toFacilityIcon(spawnPointType: SpawnPointType): FacilityIcon {
@@ -398,6 +402,7 @@ export function toFacilityIcon(spawnPointType: SpawnPointType): FacilityIcon {
     case SpawnPointType.ServicePos:
       return 'service_ico';
     case SpawnPointType.WeightStationPos:
+    case SpawnPointType.WeightCatPos:
       return 'weigh_station_ico';
     case SpawnPointType.TruckDealerPos:
       return 'dealer_ico';
@@ -405,6 +410,12 @@ export function toFacilityIcon(spawnPointType: SpawnPointType): FacilityIcon {
       return 'garage_large_ico';
     case SpawnPointType.RecruitmentPos:
       return 'recruitment_ico';
+    case SpawnPointType.Hotel:
+      return 'hotel_ico';
+    case SpawnPointType.TruckStopPos:
+      return 'truck_stop_ico';
+    case SpawnPointType.BusStation:
+      return 'bus_station_ico';
     default:
       throw new Error(`${spawnPointType} is not a facility`);
   }

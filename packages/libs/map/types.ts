@@ -160,7 +160,10 @@ export type FacilityIcon =
   | 'weigh_station_ico'
   | 'dealer_ico'
   | 'garage_large_ico'
-  | 'recruitment_ico';
+  | 'recruitment_ico'
+  | 'hotel_ico'
+  | 'truck_stop_ico'
+  | 'bus_station_ico';
 
 type UnlabeledPoi = BasePoi &
   Readonly<
